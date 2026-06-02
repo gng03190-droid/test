@@ -1,0 +1,948 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>자극에 대한 반응 실험 시뮬레이션</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700&display=swap" rel="stylesheet">
+<!-- HTML 화면을 이미지 파일로 캡처하기 위한 html2canvas 라이브러리 추가 -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<style>
+:root {
+  --yellow: #F5C842;
+  --yellow-light: #FFFBE6;
+  --yellow-border: #D4A800;
+  --blue: #3A7BD5;
+  --blue-light: #EAF1FB;
+  --green: #2EAA72;
+  --green-light: #E6F7EF;
+  --green-border: #1D8A5A;
+  --red: #E84040;
+  --red-light: #FEF0F0;
+  --orange: #F07820;
+  --orange-light: #FFF3EA;
+  --gray-50: #F8F8F6;
+  --gray-100: #EEEDE8;
+  --gray-200: #D8D7D0;
+  --gray-400: #9A9990;
+  --gray-600: #5E5D58;
+  --ink: #1A1A18;
+  --radius: 12px;
+  --radius-sm: 8px;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+body { font-family: 'Noto Sans KR', sans-serif; background: #F0EFE8; color: var(--ink); font-size: 16px; line-height: 1.6; min-height: 100vh; padding-bottom: 80px; }
+
+/* 헤더 스타일 */
+.doc-header { background: var(--ink); color: #fff; padding: 28px 20px 24px; position: relative; overflow: hidden; }
+.doc-header::before { content:''; position:absolute; right:-40px; top:-40px; width:200px; height:200px; border-radius:50%; background:rgba(255,255,255,0.05); }
+.header-tag { display:inline-block; background:var(--yellow); color:var(--ink); font-size:11px; font-weight:700; letter-spacing:0.08em; padding:3px 10px; border-radius:4px; margin-bottom:10px; }
+.doc-title { font-size:24px; font-weight:700; letter-spacing:-0.02em; line-height:1.25; margin-bottom:16px; }
+.doc-title span { color:var(--yellow); }
+.student-info-bar { display:grid; grid-template-columns:72px 72px 72px 1fr; gap:6px; }
+.info-field { background:rgba(255,255,255,0.1); border:1px solid rgba(255,255,255,0.18); border-radius:var(--radius-sm); padding:9px 11px; }
+.info-field label { display:block; font-size:10px; color:rgba(255,255,255,0.5); font-weight:700; letter-spacing:0.06em; margin-bottom:3px; }
+.info-field input { background:none; border:none; outline:none; color:#fff; font-family:'Noto Sans KR',sans-serif; font-size:15px; font-weight:500; width:100%; }
+.info-field input::placeholder { color:rgba(255,255,255,0.28); }
+
+/* 진행률 표시 */
+.progress-wrap { padding:14px 16px 0; }
+.progress-label { font-size:11px; color:var(--gray-400); display:flex; justify-content:space-between; margin-bottom:5px; }
+.progress-track { height:4px; background:var(--gray-200); border-radius:99px; overflow:hidden; }
+.progress-fill { height:100%; background:var(--ink); border-radius:99px; transition:width 0.4s ease; }
+
+/* 콘텐츠 레이아웃 */
+.content { padding:16px 16px 20px; display:flex; flex-direction:column; gap:14px; }
+.card { background:#fff; border-radius:var(--radius); overflow:hidden; border:1px solid var(--gray-200); }
+.card-header { display:flex; align-items:center; gap:10px; padding:13px 16px; border-bottom:1px solid var(--gray-100); }
+.card-icon { width:30px; height:30px; border-radius:7px; display:flex; align-items:center; justify-content:center; font-size:15px; flex-shrink:0; }
+.card-header h2 { font-size:14px; font-weight:700; }
+.card-body { padding:14px 16px; }
+
+.yellow-card .card-header { background:var(--yellow-light); }
+.yellow-card .card-icon { background:var(--yellow); }
+.blue-card .card-header { background:var(--blue-light); }
+.blue-card .card-icon { background:var(--blue); color:#fff; }
+.green-card .card-header { background:var(--green-light); }
+.green-card .card-icon { background:var(--green); color:#fff; }
+.orange-card .card-header { background:var(--orange-light); }
+.orange-card .card-icon { background:var(--orange); color:#fff; }
+
+/* 시뮬레이션 인터페이스 */
+.sim-box { width: 100%; height: 220px; background: var(--gray-100); border-radius: var(--radius); border: 2.5px dashed var(--gray-400); display: flex; flex-direction: column; align-items: center; justify-content: center; cursor: pointer; transition: all 0.1s ease; position: relative; overflow: hidden; }
+.sim-box.idle { background: var(--gray-100); border-color: var(--gray-400); border-style: dashed; }
+.sim-box.idle:active { background: var(--gray-200); }
+.sim-box.waiting { background: var(--yellow-light); border-color: var(--yellow-border); border-style: solid; box-shadow: 0 4px 15px rgba(245, 200, 66, 0.3); }
+.sim-box.ready-light { background: var(--green); border-color: var(--green-border); border-style: solid; box-shadow: 0 4px 20px rgba(46, 170, 114, 0.5); }
+.sim-box.ready-sound { background: var(--yellow-light); border-color: var(--yellow-border); border-style: solid; box-shadow: 0 4px 15px rgba(245, 200, 66, 0.3); }
+.sim-box.cheat { background: var(--red-light); border-color: var(--red); border-style: solid; animation: shake 0.4s; }
+
+.sim-msg { font-size: 18px; font-weight: 700; color: var(--gray-600); text-align: center; pointer-events: none; line-height: 1.4; padding: 0 10px; }
+.sim-box.waiting .sim-msg { color: #b08d00; font-size: 20px; }
+.sim-box.ready-light .sim-msg { color: #fff; font-size: 32px; text-shadow: 1px 1px 3px rgba(0,0,0,0.2); }
+.sim-box.cheat .sim-msg { color: var(--red); }
+
+@keyframes shake {
+  0% { transform: translateX(0); }
+  25% { transform: translateX(-5px); }
+  50% { transform: translateX(5px); }
+  75% { transform: translateX(-5px); }
+  100% { transform: translateX(0); }
+}
+
+.sim-btn-group { display: flex; gap: 8px; margin-top: 12px; }
+.sim-btn { flex: 1; padding: 14px 10px; border-radius: var(--radius-sm); font-size: 14px; font-weight: 700; cursor: pointer; border: none; color: #fff; display: flex; align-items: center; justify-content: center; gap: 6px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); transition: opacity 0.2s; font-family: 'Noto Sans KR', sans-serif;}
+.sim-btn:active { transform: translateY(1px); box-shadow: none; }
+.sim-btn.light { background: #ECA800; }
+.sim-btn.sound { background: var(--blue); }
+.sim-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+/* 학습 목표 및 탐구 박스 */
+.goal-list { display:flex; flex-direction:column; gap:9px; }
+.goal-item { display:flex; gap:10px; padding:11px 13px; background:var(--gray-50); border-radius:var(--radius-sm); font-size:14px; align-items:flex-start; }
+.goal-dot { width:7px; height:7px; border-radius:50%; background:var(--ink); margin-top:7px; flex-shrink:0; }
+.prompt-box { background:var(--yellow-light); border:1.5px dashed var(--yellow-border); border-radius:var(--radius-sm); padding:13px 15px; display:flex; gap:10px; }
+.prompt-q { font-size:20px; flex-shrink:0; margin-top:1px; }
+
+/* 입력 필드 */
+.field-label { font-size:11px; font-weight:700; color:var(--gray-600); letter-spacing:0.04em; margin-bottom:5px; display:block; }
+.answer-field { width:100%; min-height:52px; background:var(--gray-50); border:1.5px solid var(--gray-200); border-radius:var(--radius-sm); padding:11px 13px; font-family:'Noto Sans KR',sans-serif; font-size:14px; color:var(--ink); resize:none; outline:none; line-height:1.7; transition:border-color 0.15s,background 0.15s; -webkit-appearance:none; }
+.answer-field:focus { border-color:var(--blue); background:#fff; }
+.answer-field.tall { min-height:100px; }
+
+/* 경고 및 정보 박스 */
+.note-box { border-left:3px solid var(--blue); background:var(--blue-light); border-radius:0 var(--radius-sm) var(--radius-sm) 0; padding:10px 13px; font-size:13px; color:#1a3a6e; line-height:1.6; margin-bottom:12px; }
+.note-box.warn { border-color:var(--orange); background:var(--orange-light); color:#7a3800; }
+
+/* 구분선 */
+.section-div { display:flex; align-items:center; gap:10px; padding:0 4px; margin-top: 10px;}
+.section-div span { font-size:12px; font-weight:700; letter-spacing:0.08em; color:var(--gray-400); white-space:nowrap; }
+.section-div::before, .section-div::after { content:''; flex:1; height:1px; background:var(--gray-200); }
+
+/* 하드웨어 연동 데이터 업로드 */
+details.csv-details { background: var(--gray-50); border: 1.5px solid var(--gray-200); border-radius: var(--radius-sm); padding: 10px 14px; margin-bottom: 16px; }
+details.csv-details summary { font-size: 13px; font-weight: 700; color: var(--gray-600); cursor: pointer; outline: none; display: flex; align-items: center; gap: 6px; }
+details.csv-details[open] summary { margin-bottom: 12px; padding-bottom: 10px; border-bottom: 1px dashed var(--gray-200); }
+.upload-area { border:2px dashed var(--gray-300); border-radius:var(--radius-sm); padding:16px; text-align:center; background:#fff; cursor:pointer; transition:border-color 0.15s,background 0.15s; }
+.upload-area:hover { border-color:var(--blue); background:var(--blue-light); }
+.upload-area input[type=file] { display:none; }
+.upload-icon { font-size:24px; margin-bottom:6px; }
+.upload-label { font-size:13px; font-weight:500; color:var(--gray-600); }
+
+/* 데이터 표 */
+.table-wrap { overflow-x:auto; }
+table.dt { width:100%; border-collapse:collapse; font-size:13px; background:#fff; }
+table.dt th { background:var(--gray-50); padding:9px 10px; text-align:center; font-weight:700; font-size:12px; color:var(--gray-600); border:1px solid var(--gray-200); }
+table.dt td { padding:7px 8px; border:1px solid var(--gray-200); text-align:center; vertical-align:middle; }
+table.dt td input { width:100%; background:none; border:none; outline:none; text-align:center; font-family:'Noto Sans KR',sans-serif; font-size:13px; font-weight:500; color:var(--ink); padding:3px; min-width:60px; }
+table.dt tr.cheat td { background:#fff8f0; color:#c05000; }
+table.dt tr.cheat td input { color:#c05000; font-weight: 700; }
+.badge { display:inline-block; padding:2px 9px; border-radius:99px; font-size:11px; font-weight:700; }
+.badge-sound { background:var(--green-light); color:var(--green); }
+.badge-light { background:var(--yellow-light); color:#856a00; }
+.badge-cheat { background:#fff0e0; color:#c05000; font-size:10px; border: 1px solid #fbcba6;}
+
+/* 실시간 통계 요약 */
+.sum-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:8px; margin:12px 0; }
+.sum-card { background:#fff; border:1px solid var(--gray-200); border-radius:var(--radius-sm); padding:11px 10px; text-align:center; box-shadow: 0 1px 3px rgba(0,0,0,0.02); }
+.sum-label { font-size:10px; color:var(--gray-400); font-weight:700; letter-spacing:0.04em; margin-bottom:5px; }
+.sum-val { font-size:19px; font-weight:700; color:var(--ink); }
+.sum-unit { font-size:10px; color:var(--gray-400); margin-top:2px; }
+
+/* 고찰 및 질문 문항 */
+.q-block { margin-bottom:18px; }
+.q-row { display:flex; align-items:flex-start; gap:9px; margin-bottom:9px; }
+.q-num { width:24px; height:24px; background:var(--ink); color:#fff; border-radius:50%; font-size:12px; font-weight:700; display:flex; align-items:center; justify-content:center; flex-shrink:0; margin-top:2px; }
+.q-text { font-size:14px; font-weight:500; line-height:1.6; }
+.two-col { display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:9px; }
+
+/* 종합 소감 */
+.feeling-wrap { background:var(--ink); border-radius:var(--radius); padding:18px; }
+.feeling-label { font-size:11px; font-weight:700; color:rgba(255,255,255,0.45); letter-spacing:0.06em; margin-bottom:10px; }
+.feeling-wrap textarea { background:rgba(255,255,255,0.08); border:1px solid rgba(255,255,255,0.15); border-radius:var(--radius-sm); padding:13px; color:#fff; font-family:'Noto Sans KR',sans-serif; font-size:14px; line-height:1.8; min-height:110px; width:100%; outline:none; resize:none; }
+.feeling-wrap textarea:focus { border-color:var(--yellow); }
+
+/* 하단 임시저장 바 */
+.submit-bar { position:fixed; bottom:0; left:0; right:0; background:rgba(240,239,232,0.96); backdrop-filter:blur(10px); padding:10px 16px; border-top:1px solid var(--gray-200); display:flex; gap:8px; z-index:100; }
+.save-btn { flex:1; padding:13px; background:var(--ink); color:#fff; border:none; border-radius:var(--radius-sm); font-family:'Noto Sans KR',sans-serif; font-size:14px; font-weight:700; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:7px; }
+.save-btn.sec { background:#fff; color:var(--ink); border:1.5px solid var(--gray-200); flex:none; padding:13px 18px; font-size:13px; }
+
+.toast { position:fixed; bottom:76px; left:50%; transform:translateX(-50%) translateY(12px); background:var(--ink); color:#fff; padding:9px 18px; border-radius:99px; font-size:13px; font-weight:500; opacity:0; transition:all 0.28s; pointer-events:none; z-index:200; white-space:nowrap; }
+.toast.show { opacity:1; transform:translateX(-50%) translateY(0); }
+</style>
+</head>
+<body>
+
+<!-- HEADER -->
+<div class="doc-header">
+  <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 16px;">
+    <div>
+      <div class="header-tag">중학교 3학년 · 자극과 반응</div>
+      <div class="doc-title" style="margin-bottom:0;"><span>자극</span>에 대한 반응 실험</div>
+    </div>
+    <div style="text-align: right;">
+      <input type="date" id="f-date" style="background:rgba(255,255,255,0.1); border:1px solid rgba(255,255,255,0.18); border-radius:var(--radius-sm); padding:6px 10px; color:#fff; font-family:'Noto Sans KR', sans-serif; outline:none; color-scheme: dark; font-size: 13px;">
+    </div>
+  </div>
+  <div class="student-info-bar">
+    <div class="info-field">
+      <label>학년</label>
+      <input type="text" id="f-grade" placeholder="3" inputmode="numeric">
+    </div>
+    <div class="info-field">
+      <label>반</label>
+      <input type="text" id="f-class" placeholder="2" inputmode="numeric">
+    </div>
+    <div class="info-field">
+      <label>번호</label>
+      <input type="text" id="f-num" placeholder="15" inputmode="numeric">
+    </div>
+    <div class="info-field">
+      <label>이름</label>
+      <input type="text" id="f-name" placeholder="홍길동" inputmode="text">
+    </div>
+  </div>
+</div>
+
+<!-- PROGRESS -->
+<div class="progress-wrap">
+  <div class="progress-label"><span>보고서 작성 진행률</span><span id="pct">0%</span></div>
+  <div class="progress-track"><div class="progress-fill" id="pfill" style="width:0%"></div></div>
+</div>
+
+<div class="content">
+
+  <!-- 학습목표 -->
+  <div class="card yellow-card">
+    <div class="card-header">
+      <div class="card-icon">🎯</div>
+      <h2>학습 목표</h2>
+    </div>
+    <div class="card-body">
+      <div class="goal-list">
+        <div class="goal-item"><div class="goal-dot"></div><span>시각 자극(빛)과 청각 자극(소리)에 대한 나의 반응속도를 측정한다.</span></div>
+        <div class="goal-item"><div class="goal-dot"></div><span>측정 결과를 통해 청각에 의한 반응과 시각에 의한 반응 차이를 비교·분석하여 자극에 대한 반응 경로의 차이를 설명한다.</span></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 탐구 질문 -->
+  <div class="prompt-box">
+    <div class="prompt-q">🔍</div>
+    <div style="flex:1">
+      <p style="font-size:14px;font-weight:700;margin-bottom:8px">탐구 질문: 시각과 청각 중 어느 것이 더 빠르게 반응할까요?</p>
+      <label class="field-label">나의 예상 (실험 전)</label>
+      <textarea class="answer-field" id="q-predict" placeholder="이유와 함께 나의 예상을 써보세요..." rows="2"></textarea>
+    </div>
+  </div>
+
+  <!-- 실험하기 (시뮬레이터) -->
+  <div class="section-div"><span>실험하기 (웹 시뮬레이터)</span></div>
+
+  <div class="card green-card">
+    <div class="card-header">
+      <div class="card-icon">⚡</div>
+      <h2>반응속도 측정 시뮬레이션</h2>
+    </div>
+    <div class="card-body">
+      <div class="note-box warn" style="margin-bottom:12px; display: flex; flex-direction: column; gap: 8px;">
+        <div>⚠️ <b>자극 전 화면을 미리 누르면 10초(부정행위)로 기록됩니다.</b> 자극 발생 시 신속히 터치하세요!</div>
+        <div style="color:var(--red); font-weight:700;">※ 중요: 소리 테스트 전 스마트폰 무음 모드(매너 모드)를 해제하고 볼륨을 키우세요.</div>
+        <div>
+          <button onclick="playTestBeep();" style="display: inline-flex; align-items: center; gap: 6px; background: #fff; border: 1.5px solid var(--blue); color: var(--blue); padding: 6px 12px; border-radius: var(--radius-sm); font-size: 12px; font-weight: 700; cursor: pointer; box-shadow: 0 1px 3px rgba(0,0,0,0.05);">
+            🔊 <b>기기 소리 테스트 해보기</b>
+          </button>
+        </div>
+      </div>
+      
+      <!-- 인터랙티브 시뮬레이션 영역 -->
+      <div id="sim-area" class="sim-box idle">
+        <div id="sim-msg" class="sim-msg">
+          아래 버튼을 눌러<br>테스트를 시작하세요
+        </div>
+      </div>
+      
+      <div class="sim-btn-group">
+        <button class="sim-btn light" id="btn-light" onclick="startSim('light')">💡 빛 반응 테스트 (0/10)</button>
+        <button class="sim-btn sound" id="btn-sound" onclick="startSim('sound')">🔊 소리 반응 테스트 (0/10)</button>
+      </div>
+      <div class="sim-btn-group" style="margin-top: 8px; display: flex; gap: 8px;">
+        <button class="sim-btn" style="background:var(--ink); flex: 1;" id="btn-random" onclick="toggleRandomSim()">🎲 연속 랜덤 테스트 시작 (0/20)</button>
+        <button class="sim-btn" style="background:var(--red); flex: 0 0 auto; padding: 14px 20px;" onclick="clearData()">🔄 초기화</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 데이터 분석 -->
+  <div class="section-div"><span>데이터 수집 및 분석</span></div>
+
+  <div class="card orange-card">
+    <div class="card-header">
+      <div class="card-icon">📊</div>
+      <h2>데이터 분석</h2>
+    </div>
+    <div class="card-body">
+
+      <!-- 피코 데이터 업로드 (선택사항) -->
+      <details class="csv-details">
+        <summary>🔌 피코(하드웨어) 측정 데이터 불러오기 (선택)</summary>
+        <div style="font-size:12px; color:var(--gray-600); margin-bottom:8px;">무선 피코 장치로 측정한 경우 <b>data-nerve-time-1.csv</b> 파일을 불러올 수 있습니다.</div>
+        <div class="upload-area" id="upload-area" onclick="document.getElementById('csv-input').click()">
+          <input type="file" id="csv-input" accept=".csv" onchange="handleCSV(this)">
+          <div class="upload-icon">📂</div>
+          <div class="upload-label">파일 선택 (탭하여 업로드)</div>
+        </div>
+        <div id="csv-status" style="font-size:12px;color:var(--blue);margin-top:6px;"></div>
+      </details>
+
+      <!-- 평균 요약 -->
+      <label class="field-label">나의 평균 반응 시간 (부정행위 10초 데이터 제외)</label>
+      <div class="sum-grid">
+        <div class="sum-card">
+          <div class="sum-label">🔊 청각 평균</div>
+          <div class="sum-val" id="avg-s">—</div>
+          <div class="sum-unit">초</div>
+        </div>
+        <div class="sum-card">
+          <div class="sum-label">💡 시각 평균</div>
+          <div class="sum-val" id="avg-l">—</div>
+          <div class="sum-unit">초</div>
+        </div>
+        <div class="sum-card">
+          <div class="sum-label">차이 (시각 - 청각)</div>
+          <div class="sum-val" id="avg-d">—</div>
+          <div class="sum-unit">초</div>
+        </div>
+      </div>
+
+      <!-- 반응 속도 비교 그래프 -->
+      <div class="graph-box" style="margin-top: 16px; margin-bottom: 24px; background: var(--gray-50); border: 1px solid var(--gray-200); border-radius: var(--radius-sm); padding: 16px;">
+        <label class="field-label" style="text-align: center; margin-bottom: 16px;">나의 반응 속도 비교 그래프</label>
+        <div style="display: flex; align-items: flex-end; height: 120px; gap: 60px; justify-content: center; padding-top: 20px; border-bottom: 2px solid var(--gray-200); position: relative;">
+          <div id="bar-s" style="width: 50px; background: var(--blue); height: 0%; transition: height 0.5s; border-radius: 4px 4px 0 0; position: relative; box-shadow: 0 -2px 5px rgba(0,0,0,0.1);">
+             <div id="bar-s-val" style="position: absolute; top: -22px; width: 100%; text-align: center; font-size: 13px; font-weight: 700; color: var(--blue);">0.000</div>
+          </div>
+          <div id="bar-l" style="width: 50px; background: #ECA800; height: 0%; transition: height 0.5s; border-radius: 4px 4px 0 0; position: relative; box-shadow: 0 -2px 5px rgba(0,0,0,0.1);">
+             <div id="bar-l-val" style="position: absolute; top: -22px; width: 100%; text-align: center; font-size: 13px; font-weight: 700; color: #ECA800;">0.000</div>
+          </div>
+        </div>
+        <div style="display: flex; justify-content: center; gap: 60px; margin-top: 8px; font-size: 13px; font-weight: 700; color: var(--gray-600);">
+          <div style="width: 50px; text-align: center;">청각(소리)</div>
+          <div style="width: 50px; text-align: center;">시각(빛)</div>
+        </div>
+      </div>
+
+      <!-- 측정 기록 표 -->
+      <label class="field-label" style="margin-top:16px;">측정 데이터 기록 (시뮬레이션 결과 자동 입력)</label>
+      <div class="table-wrap">
+        <table class="dt">
+          <thead>
+            <tr>
+              <th style="width:32px">#</th>
+              <th style="width:80px">자극종류</th>
+              <th>반응시간 (초)</th>
+              <th style="width:32px"></th>
+            </tr>
+          </thead>
+          <tbody id="dt-body">
+            <tr><td colspan="4" style="padding:20px; color:var(--gray-400);">아직 측정된 데이터가 없습니다.<br>위 시뮬레이터에서 측정을 시작하세요.</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- 결과 분석 (고찰) -->
+  <div class="section-div"><span>결과 분석 (고찰)</span></div>
+
+  <div class="card">
+    <div class="card-header" style="background:var(--gray-50)">
+      <div class="card-icon" style="background:var(--gray-100);font-size:18px">🤔</div>
+      <h2>결과 분석</h2>
+    </div>
+    <div class="card-body">
+
+      <div class="q-block">
+        <div class="q-row">
+          <span class="q-num">1</span>
+          <span class="q-text">시각 반응과 청각 반응 중 더 빠르게 일어나는 것은 무엇인가? 측정한 데이터의 평균값을 근거로 서술하시오.</span>
+        </div>
+        <textarea class="answer-field tall" id="q1" placeholder="나의 측정 결과, 청각 평균은 ___초, 시각 평균은 ___초로 ___이 더 빠르다. 이는..."></textarea>
+      </div>
+
+      <div class="q-block">
+        <div class="q-row">
+          <span class="q-num">2</span>
+          <span class="q-text">시각 반응과 청각 반응 경로의 차이를 신경계 관점에서 서술하시오.</span>
+        </div>
+        <div class="two-col">
+          <div>
+            <label class="field-label" style="color:var(--green)">🔊 청각 반응 경로</label>
+            <textarea class="answer-field" style="min-height:80px;font-size:13px" id="q2s" placeholder="소리 자극에 대한 반응 경로를 적어주세요."></textarea>
+          </div>
+          <div>
+            <label class="field-label" style="color:#856a00">💡 시각 반응 경로</label>
+            <textarea class="answer-field" style="min-height:80px;font-size:13px" id="q2l" placeholder="빛 자극에 대한 반응 경로를 적어주세요."></textarea>
+          </div>
+        </div>
+        <label class="field-label">두 경로의 차이점 및 반응 속도가 다른 이유</label>
+        <textarea class="answer-field" id="q2d" placeholder="두 자극이 뇌로 전달되는 경로의 길이나 특성 차이를 바탕으로 반응 속도가 다르게 나타난 이유를 서술하세요."></textarea>
+      </div>
+
+      <div class="q-block">
+        <div class="q-row">
+          <span class="q-num">3</span>
+          <span class="q-text">이 실험의 한계점 혹은 개선 방안은 무엇인가? (예: 스마트폰 기기의 터치 지연, 개인의 집중력 등)</span>
+        </div>
+        <textarea class="answer-field tall" id="q3" placeholder="측정 과정에서 발생할 수 있는 오류나 오차의 원인, 그리고 이를 개선할 방법을 서술하세요..."></textarea>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- 소감 -->
+  <div class="feeling-wrap">
+    <div class="feeling-label">✨ 소감 및 느낀점</div>
+    <textarea id="feeling" placeholder="실험을 통해 새롭게 알게 된 점이나 느낀 점을 자유롭게 쓰세요..."></textarea>
+  </div>
+
+</div><!-- /content -->
+
+<!-- SUBMIT BAR -->
+<div class="submit-bar">
+  <button class="save-btn sec" onclick="resetForm()">작성글 전체 초기화</button>
+  <button class="save-btn" onclick="saveAsImage()">
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+    보고서 이미지로 저장하기 (제출용)
+  </button>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+/* =======================================
+   0. 전역 변수 및 DOM 참조 최상단 선언 (TDZ 방지)
+======================================= */
+// 데이터 배열 선언
+let rows = []; // {type:'sound'|'light', time: float/string}
+
+// DOM 요소 참조 캐싱
+const simArea = document.getElementById('sim-area');
+const simMsg = document.getElementById('sim-msg');
+const btnLight = document.getElementById('btn-light');
+const btnSound = document.getElementById('btn-sound');
+const btnRandom = document.getElementById('btn-random');
+const tbody = document.getElementById('dt-body');
+
+/* =======================================
+   1. 웹 시뮬레이션 로직 (Web Simulation)
+======================================= */
+let simState = 'IDLE'; // IDLE, WAITING, READY
+let simType = ''; // 'light', 'sound'
+let simTimeout = null;
+let sequenceTimer = null; // 자동 연속 진행 타이머
+let isRandomSequence = false; // 랜덤 자동 측정 모드 상태
+let startTime = 0;
+
+// 오디오 엔진 관리 변수
+let audioCtx = null;
+
+// 오디오 엔진 강제 잠금 해제 및 활성화 함수
+function wakeAudio() {
+  try {
+    const AudioContext = window.AudioContext || window.webkitAudioContext;
+    if (!audioCtx) {
+      audioCtx = new AudioContext();
+    }
+    // 모바일 브라우저에 의해 오디오가 자동 음소거(suspended) 되었을 경우 매번 강제로 해제
+    if (audioCtx.state === 'suspended') {
+      audioCtx.resume();
+    }
+  } catch (e) {
+    console.error("오디오 엔진 깨우기 실패:", e);
+  }
+}
+
+// 사용자가 화면을 누르는 모든 행위에 소리 잠금 해제 함수를 연동합니다 (iOS/안드로이드 완전 우회)
+['click', 'touchstart', 'touchend', 'mousedown'].forEach(event => {
+  document.addEventListener(event, wakeAudio, { passive: true });
+});
+
+// 오디오 작동 여부 테스트용 즉각 비프음
+function playTestBeep() {
+  wakeAudio();
+  playBeep();
+  showToast("🔊 소리가 들리나요? 안 들리면 기기 무음 스위치를 끄고 볼륨을 키우세요.");
+}
+
+// 1000Hz 순수 사인파(Sine Wave) 비프음 발생
+function playBeep() {
+  try {
+    wakeAudio(); // 비프음 발생 직전에 오디오 엔진 상태 재차 깨움
+    if (!audioCtx) return;
+
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+
+    // 스마트폰 스피커에 왜곡 없이 완벽하고 선명하게 지원되는 사인파 적용
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(1000, audioCtx.currentTime); // 인간의 귀가 가장 잘 인지하는 1000Hz 주파수
+
+    gain.gain.setValueAtTime(0.6, audioCtx.currentTime);
+    // iOS의 안전한 렌더링을 위해 linearRamp를 이용한 완전한 무음 처리
+    gain.gain.linearRampToValueAtTime(0.001, audioCtx.currentTime + 0.2);
+
+    osc.connect(gain);
+    gain.connect(audioCtx.destination);
+    
+    osc.start(audioCtx.currentTime);
+    osc.stop(audioCtx.currentTime + 0.25);
+  } catch (e) {
+    console.error("비프음 재생 실패:", e);
+  }
+}
+
+function getTestCounts() {
+  const lc = rows.filter(r => r.type === 'light').length;
+  const sc = rows.filter(r => r.type === 'sound').length;
+  return { lc, sc };
+}
+
+function updateBtnStates() {
+  const { lc, sc } = getTestCounts();
+  
+  btnLight.innerHTML = `💡 빛 반응 테스트 (${lc}/10)`;
+  btnSound.innerHTML = `🔊 소리 반응 테스트 (${sc}/10)`;
+  
+  btnLight.disabled = lc >= 10 || simState !== 'IDLE' || isRandomSequence;
+  btnSound.disabled = sc >= 10 || simState !== 'IDLE' || isRandomSequence;
+  
+  if(btnRandom) {
+    if(isRandomSequence) {
+      btnRandom.innerHTML = `⏹ 연속 랜덤 테스트 중지 (${lc+sc}/20)`;
+      btnRandom.style.background = 'var(--red)';
+      btnRandom.disabled = false;
+    } else {
+      btnRandom.innerHTML = `🎲 연속 랜덤 테스트 시작 (${lc+sc}/20)`;
+      btnRandom.style.background = 'var(--ink)';
+      btnRandom.disabled = (lc >= 10 && sc >= 10) || simState !== 'IDLE';
+    }
+  }
+}
+
+// 랜덤 테스트 시작/중지 토글
+function toggleRandomSim() {
+  wakeAudio(); // 버튼 클릭 동작으로 오디오 전격 활성화
+  
+  if(isRandomSequence) {
+    // 중지 상태 처리
+    isRandomSequence = false;
+    clearTimeout(sequenceTimer);
+    if(simState === 'WAITING') {
+      clearTimeout(simTimeout);
+      simState = 'IDLE';
+    }
+    setSimUI('idle', '랜덤 테스트가 중지되었습니다.<br><span style="font-size:13px;">아래 버튼을 눌러 테스트를 시작하세요.</span>');
+    updateBtnStates();
+  } else {
+    // 시작 처리
+    const { lc, sc } = getTestCounts();
+    if(lc >= 10 && sc >= 10) {
+      showToast('이미 20회 측정을 모두 완료했습니다.');
+      return;
+    }
+    isRandomSequence = true;
+    showToast('🔊 연속 랜덤 측정을 시작합니다. 볼륨을 확인해 주세요!');
+    startNextRandom();
+  }
+}
+
+// 다음 랜덤 테스트 자동 실행 (비동기 체인)
+function startNextRandom() {
+  if(!isRandomSequence) return;
+  const { lc, sc } = getTestCounts();
+  let pool = [];
+  if(lc < 10) pool.push('light');
+  if(sc < 10) pool.push('sound');
+  
+  if(pool.length === 0) {
+    isRandomSequence = false;
+    showToast('총 20회 랜덤 테스트가 모두 완료되었습니다!');
+    setSimUI('idle', '모든 테스트 완료!<br><span style="font-size:13px;">아래 결과 표와 그래프를 확인하세요.</span>');
+    updateBtnStates();
+    return;
+  }
+  
+  const randomChoice = pool[Math.floor(Math.random() * pool.length)];
+  startSim(randomChoice);
+}
+
+// 테스트 시작
+function startSim(type) {
+  if(simState !== 'IDLE') return;
+  
+  wakeAudio(); // 테스트 시작 단계에서 한 번 더 깨움
+  
+  const { lc, sc } = getTestCounts();
+  if(type === 'light' && lc >= 10) return;
+  if(type === 'sound' && sc >= 10) return;
+
+  simType = type;
+  simState = 'WAITING';
+  updateBtnStates();
+  
+  // 빛/소리 힌트를 주지 않는 동일한 지시문 표기
+  setSimUI('waiting', '준비...<br><span style="font-size:14px; font-weight:normal;">(자극이 발생하면 즉시 화면을 터치하세요)</span>');
+
+  // 2~5초 사이 무작위 지연시간
+  const delay = Math.random() * 3000 + 2000;
+  simTimeout = setTimeout(triggerStimulus, delay);
+}
+
+// 자극 발생 시점 처리
+function triggerStimulus() {
+  if(simState !== 'WAITING') return;
+  
+  simState = 'READY';
+  startTime = performance.now();
+
+  if(simType === 'light') {
+    // 시각 자극: 텍스트 힌트 없이 오직 화면만 초록색으로 바뀜
+    setSimUI('ready-light', '');
+  } else if(simType === 'sound') {
+    // 청각 자극: 시각적 대기화면을 그대로 유지한 채 비프음만 선명하게 울림
+    setSimUI('waiting', '준비...<br><span style="font-size:14px; font-weight:normal;">(자극이 발생하면 즉시 화면을 터치하세요)</span>');
+    playBeep();
+  }
+}
+
+// 화면 터치 또는 클릭 반응
+function handleReaction(e) {
+  if(e.cancelable) e.preventDefault(); // 다중 이벤트 방지
+  
+  wakeAudio(); // 사용자가 반응속도 측정을 위해 화면을 탭하는 순간을 캐치해 오디오 생명력을 무한 연장시킵니다.
+
+  if(simState === 'IDLE') return;
+
+  if(simState === 'WAITING') {
+    // 미리 누른 부정행위 처리
+    clearTimeout(simTimeout);
+    simState = 'IDLE';
+    
+    recordData(simType, 10.0); // 10초 페널티 부여
+    setSimUI('cheat', '⚠️ 너무 일찍 눌렀습니다!<br><span style="font-size:14px; font-weight:normal;">(부정행위 판정: 10초 기록됨)</span>');
+    
+    if(isRandomSequence) {
+      sequenceTimer = setTimeout(startNextRandom, 1500);
+    } else {
+      updateBtnStates();
+    }
+    
+  } else if(simState === 'READY') {
+    // 정상적인 자극 감지 반응 속도 산정
+    const endTime = performance.now();
+    const reactionTime = (endTime - startTime) / 1000;
+    
+    simState = 'IDLE';
+    recordData(simType, reactionTime);
+    
+    const msg = `✅ 반응속도: <b style="color:var(--ink);">${reactionTime.toFixed(3)}초</b><br>` + 
+                (isRandomSequence ? `<span style="font-size:13px; font-weight:normal;">잠시 후 다음 테스트가 시작됩니다...</span>` : `<span style="font-size:13px; font-weight:normal;">아래 버튼을 눌러 계속 진행하세요.</span>`);
+    setSimUI('idle', msg);
+    
+    if(isRandomSequence) {
+      sequenceTimer = setTimeout(startNextRandom, 1500);
+    } else {
+      updateBtnStates();
+    }
+  }
+}
+
+function setSimUI(className, htmlContent) {
+  simArea.className = `sim-box ${className}`;
+  if(htmlContent !== undefined) {
+    simMsg.innerHTML = htmlContent;
+  }
+}
+
+// 기기 환경 호환성 등록
+simArea.addEventListener('mousedown', handleReaction);
+simArea.addEventListener('touchstart', handleReaction, {passive: false});
+
+
+/* =======================================
+   2. 데이터 관리 로직
+======================================= */
+function recordData(type, timeSec) {
+  rows.push({ type: type, time: timeSec.toFixed(3) });
+  renderTable();
+  calcAvg();
+  saveForm(); // 자동 세션 저장
+  updateBtnStates();
+}
+
+function renderTable() {
+  if(rows.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="4" style="padding:20px; color:var(--gray-400);">아직 측정된 데이터가 없습니다.<br>위 시뮬레이터에서 측정을 시작하세요.</td></tr>';
+    updateProgress();
+    updateBtnStates();
+    return;
+  }
+
+  tbody.innerHTML = '';
+  [...rows].reverse().forEach((r, reversedIndex) => {
+    const originalIndex = rows.length - 1 - reversedIndex;
+    const isCheat = parseFloat(r.time) >= 9.9;
+    const tr = document.createElement('tr');
+    if (isCheat) tr.classList.add('cheat');
+    
+    const badge = r.type === 'sound'
+      ? '<span class="badge badge-sound">청각</span>'
+      : '<span class="badge badge-light">시각</span>';
+    const cheatMark = isCheat ? ' <span class="badge badge-cheat">부정행위</span>' : '';
+    
+    tr.innerHTML = `
+      <td style="color:var(--gray-400);font-size:12px">${originalIndex + 1}</td>
+      <td>${badge}${cheatMark}</td>
+      <td><input type="text" inputmode="decimal" value="${r.time}" 
+           onchange="rows[${originalIndex}].time=this.value; calcAvg(); renderTable(); updateProgress()"></td>
+      <td><button onclick="deleteRow(${originalIndex})"
+           style="background:none;border:none;cursor:pointer;color:var(--gray-400);font-size:16px;padding:2px 6px">×</button></td>`;
+    tbody.appendChild(tr);
+  });
+  updateProgress();
+}
+
+function deleteRow(index) {
+  rows.splice(index, 1);
+  renderTable();
+  calcAvg();
+  updateBtnStates();
+}
+
+function clearData() {
+  if(confirm("기록된 측정 데이터를 모두 삭제하고 초기화하시겠습니까?")) {
+    isRandomSequence = false;
+    clearTimeout(sequenceTimer);
+    clearTimeout(simTimeout);
+    simState = 'IDLE';
+    rows = [];
+    renderTable();
+    calcAvg();
+    updateBtnStates();
+    setSimUI('idle', '아래 버튼을 눌러<br>테스트를 시작하세요');
+  }
+}
+
+// 평균 산정 및 비교 그래프 그리기
+function calcAvg() {
+  const sounds = rows.filter(r => r.type==='sound' && parseFloat(r.time) > 0 && parseFloat(r.time) < 9.9).map(r=>parseFloat(r.time));
+  const lights = rows.filter(r => r.type==='light' && parseFloat(r.time) > 0 && parseFloat(r.time) < 9.9).map(r=>parseFloat(r.time));
+  
+  const avg = arr => arr.length ? arr.reduce((a,b)=>a+b,0)/arr.length : null;
+  const sa = avg(sounds), la = avg(lights);
+  
+  document.getElementById('avg-s').textContent = sa !== null ? sa.toFixed(3) : '—';
+  document.getElementById('avg-l').textContent = la !== null ? la.toFixed(3) : '—';
+  document.getElementById('avg-d').textContent = (sa !== null && la !== null) ? Math.abs(la - sa).toFixed(3) : '—';
+  
+  // 실시간 그래프 드로잉 비율 연산
+  const maxTime = Math.max(0.4, sa || 0, la || 0) * 1.3;
+  const hS = sa !== null ? (sa / maxTime) * 100 : 0;
+  const hL = la !== null ? (la / maxTime) * 100 : 0;
+
+  document.getElementById('bar-s').style.height = `${hS}%`;
+  document.getElementById('bar-s-val').textContent = sa !== null ? sa.toFixed(3) : '0.000';
+  
+  document.getElementById('bar-l').style.height = `${hL}%`;
+  document.getElementById('bar-l-val').textContent = la !== null ? la.toFixed(3) : '0.000';
+
+  updateProgress();
+}
+
+// 피코 CSV 파싱 모듈
+function handleCSV(input) {
+  const file = input.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    try {
+      const lines = e.target.result.trim().split('\n');
+      const header = lines[0].toLowerCase();
+      let newRows = [];
+
+      if (header.includes('kind_of_nerve')) {
+        for (let i = 1; i < lines.length; i++) {
+          const cols = lines[i].split(',');
+          if (cols.length < 2) continue;
+          const type = cols[0].trim().toLowerCase().includes('sound') ? 'sound' : 'light';
+          let time = cols[1].trim().replace(/['"]/g, '');
+          if (time) newRows.push({type, time: parseFloat(time).toFixed(3)});
+        }
+      } else {
+        for (let i = 1; i < lines.length; i++) {
+          const cols = lines[i].split(',');
+          if (cols.length < 2) continue;
+          const s = cols[0].trim().replace(/['"]/g, '');
+          const l = cols[1].trim().replace(/['"]/g, '');
+          if (s && parseFloat(s) > 0) newRows.push({type:'sound', time:parseFloat(s).toFixed(3)});
+          else if (l && parseFloat(l) > 0) newRows.push({type:'light', time:parseFloat(l).toFixed(3)});
+        }
+      }
+
+      if (newRows.length === 0) { showToast('데이터를 읽을 수 없습니다'); return; }
+      rows = rows.concat(newRows);
+      renderTable();
+      calcAvg();
+      document.getElementById('csv-status').textContent = `✅ ${file.name} 에서 ${newRows.length}개 추가됨`;
+      showToast(`CSV 불러오기 완료 (${newRows.length}개)`);
+    } catch(err) {
+      showToast('CSV 파싱 오류 발생');
+    }
+  };
+  reader.readAsText(file, 'UTF-8');
+}
+
+
+/* =======================================
+   3. 부가 기능 (저장, 진행률, 토스트)
+======================================= */
+function updateProgress() {
+  const textIds = ['f-name','f-grade','f-class','f-num','f-date','q-predict','q1','q2s','q2l','q2d','q3','feeling'];
+  let filled = textIds.filter(id => { const el=document.getElementById(id); return el&&el.value.trim().length>0; }).length;
+  
+  const validDataCount = rows.filter(r=>parseFloat(r.time)>0 && parseFloat(r.time)<9.9).length;
+  if (validDataCount >= 10) filled += 3;
+  else if (validDataCount >= 5) filled += 1;
+
+  const total = textIds.length + 3;
+  const pct = Math.min(100, Math.round(filled/total*100));
+  
+  document.getElementById('pfill').style.width = pct + '%';
+  document.getElementById('pct').textContent = pct + '%';
+}
+
+document.querySelectorAll('input:not([type=file]), textarea').forEach(el => el.addEventListener('input', updateProgress));
+
+function g(id) { const el=document.getElementById(id); return el ? el.value : ''; }
+function s(id, val) { const el=document.getElementById(id); if(el&&val!=null) el.value=val; }
+
+function saveForm() {
+  const data = {
+    name: g('f-name'), grade: g('f-grade'), classN: g('f-class'), num: g('f-num'), date: g('f-date'),
+    predict: g('q-predict'), q1: g('q1'), q2s: g('q2s'), q2l: g('q2l'), q2d: g('q2d'), q3: g('q3'),
+    feeling: g('feeling'), rows: rows, savedAt: new Date().getTime()
+  };
+  localStorage.setItem('sim_rwks', JSON.stringify(data));
+}
+
+// === [신규 추가] 보고서 화면을 이미지(PNG)로 캡처 및 다운로드 ===
+function saveAsImage() {
+  // 1. 혹시 모를 브라우저 종료에 대비해 로컬저장소에 백업 먼저 수행
+  saveForm();
+  
+  // 2. 알림 메시지 표시
+  showToast('📸 보고서 이미지 파일 생성 중... 잠시만 기다려주세요.');
+  
+  // 3. 캡처 결과물에 아래 버튼 바가 나오지 않도록 임시로 숨김 처리
+  const submitBar = document.querySelector('.submit-bar');
+  submitBar.style.display = 'none';
+  
+  // 4. html2canvas 옵션 설정 및 실행
+  html2canvas(document.body, {
+    useCORS: true,           // 외부 웹 폰트 정상 렌더링용 허용
+    backgroundColor: '#F0EFE8', // 배경색 지정 (투명 방지)
+    scale: 2,                // 글씨가 선명하게 캡처되도록 해상도 2배 확대
+    logging: false,
+    onclone: (clonedDoc) => {
+      // 복제된 가상 DOM 구조 내부의 버튼바는 확실히 제거
+      const clonedSubmitBar = clonedDoc.querySelector('.submit-bar');
+      if (clonedSubmitBar) {
+        clonedSubmitBar.style.display = 'none';
+      }
+      
+      // html2canvas 버그 방지: 타이핑된 입력 필드(input, textarea) 값들을 가상 돔에 강제로 동기화
+      const inputIds = ['f-name', 'f-grade', 'f-class', 'f-num', 'f-date', 'q-predict', 'q1', 'q2s', 'q2l', 'q2d', 'q3', 'feeling'];
+      inputIds.forEach(id => {
+        const originalEl = document.getElementById(id);
+        const clonedEl = clonedDoc.getElementById(id);
+        if (originalEl && clonedEl) {
+          clonedEl.value = originalEl.value;
+        }
+      });
+    }
+  }).then(canvas => {
+    // 하단 바 원상복구
+    submitBar.style.display = 'flex';
+    
+    try {
+      // 학생 정보 기반으로 명확하고 깔끔한 파일명 포맷 생성
+      const grade = g('f-grade') || '3';
+      const classN = g('f-class') || 'x';
+      const num = g('f-num') || 'xx';
+      const name = g('f-name') || '학생';
+      const fileName = `${grade}학년_${classN}반_${num}번_${name}_자극에대한반응_실험보고서.png`;
+      
+      // 파일 다운로드 링크 생성 및 가상 클릭 트리거
+      const link = document.createElement('a');
+      link.download = fileName;
+      link.href = canvas.toDataURL('image/png');
+      link.click();
+      
+      showToast('💾 이미지 저장 완료! 생성된 파일을 선생님께 제출하세요.');
+    } catch (err) {
+      console.error("이미지 다운로드 실패:", err);
+      showToast('❌ 이미지 저장 실패. 크롬이나 사파리 앱을 권장합니다.');
+    }
+  }).catch(err => {
+    submitBar.style.display = 'flex';
+    showToast('❌ 캡처 처리 중 오류가 발생했습니다.');
+    console.error(err);
+  });
+}
+
+function loadForm() {
+  try {
+    const saved = localStorage.getItem('sim_rwks');
+    if (!saved) {
+      const today = new Date().toISOString().split('T')[0];
+      s('f-date', today);
+      updateBtnStates();
+      return;
+    }
+    const d = JSON.parse(saved);
+    s('f-name',d.name); s('f-grade',d.grade); s('f-class',d.classN); s('f-num',d.num); s('f-date', d.date);
+    s('q-predict',d.predict); s('q1',d.q1); s('q2s',d.q2s); s('q2l',d.q2l); s('q2d',d.q2d); s('q3',d.q3);
+    s('feeling',d.feeling); 
+    
+    if(!g('f-date')) {
+       s('f-date', new Date().toISOString().split('T')[0]);
+    }
+
+    if (d.rows && Array.isArray(d.rows)) { rows = d.rows; renderTable(); calcAvg(); }
+    updateProgress();
+    updateBtnStates();
+  } catch(e) {}
+}
+
+function resetForm() {
+  if (!confirm('기록된 데이터와 작성한 내용이 모두 초기화됩니다. 계속할까요?')) return;
+  localStorage.removeItem('sim_rwks');
+  location.reload();
+}
+
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 2500);
+}
+
+// 30초 자동 세션 백업
+setInterval(() => { if (g('f-name').trim() || rows.length > 0) saveForm(); }, 30000);
+
+// 페이지 로드 시 복원
+window.onload = loadForm;
+</script>
+</body>
+</html>
