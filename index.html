@@ -358,24 +358,26 @@ table.dt tr.cheat td input { color:#c05000; font-weight: 700; }
       <div class="q-block">
         <div class="q-row">
           <span class="q-num">1</span>
-          <span class="q-text">시각 반응과 청각 반응 중 더 빠르게 일어나는 것은 무엇인가? 측정한 데이터의 평균값을 근거로 서술하시오.</span>
+          <span class="q-text">시각 반응과 청각 반응 중 더 빠르게 일어나는 것은 무엇인가?</span>
         </div>
-        <textarea class="answer-field tall" id="q1" placeholder="나의 측정 결과, 청각 평균은 ___초, 시각 평균은 ___초로 ___이 더 빠르다. 이는..."></textarea>
+        <textarea class="answer-field tall" id="q1" placeholder="답변을 입력하세요..."></textarea>
       </div>
 
       <div class="q-block">
         <div class="q-row">
           <span class="q-num">2</span>
-          <span class="q-text">시각 반응과 청각 반응 경로의 차이를 신경계 관점에서 서술하시오.</span>
+          <span class="q-text">시각 반응과 청각 반응 경로의 차이를 신경계 관점에서 서술하시오. (자극에서 반응하기까지의 경로)</span>
         </div>
         <div class="two-col">
           <div>
             <label class="field-label" style="color:var(--green)">🔊 청각 반응 경로</label>
-            <textarea class="answer-field" style="min-height:80px;font-size:13px" id="q2s" placeholder="소리 자극에 대한 반응 경로를 적어주세요."></textarea>
+            <!-- 힌트의 '-> ··· ->'를 깔끔한 기호 화살표 '→ ··· →'로 변경 -->
+            <textarea class="answer-field" style="min-height:80px;font-size:13px" id="q2s" placeholder="자극(소리) → ··· → 반응"></textarea>
           </div>
           <div>
             <label class="field-label" style="color:#856a00">💡 시각 반응 경로</label>
-            <textarea class="answer-field" style="min-height:80px;font-size:13px" id="q2l" placeholder="빛 자극에 대한 반응 경로를 적어주세요."></textarea>
+            <!-- 힌트의 '-> ··· ->'를 깔끔한 기호 화살표 '→ ··· →'로 변경 -->
+            <textarea class="answer-field" style="min-height:80px;font-size:13px" id="q2l" placeholder="자극(빛) → ··· → 반응"></textarea>
           </div>
         </div>
       </div>
@@ -383,7 +385,7 @@ table.dt tr.cheat td input { color:#c05000; font-weight: 700; }
       <div class="q-block">
         <div class="q-row">
           <span class="q-num">3</span>
-          <span class="q-text">이 실험의 한계점 혹은 개선 방안은 무엇인가? (예: 스마트폰 기기의 터치 지연, 개인의 집중력 등)</span>
+          <span class="q-text">이 실험의 한계점 혹은 개선 방안은 무엇인가?</span>
         </div>
         <textarea class="answer-field tall" id="q3" placeholder="측정 과정에서 발생할 수 있는 오류나 오차의 원인, 그리고 이를 개선할 방법을 서술하세요..."></textarea>
       </div>
@@ -849,13 +851,50 @@ function saveAsImage() {
         clonedSubmitBar.style.display = 'none';
       }
       
-      // html2canvas 버그 방지: 타이핑된 입력 필드(input, textarea) 값들을 가상 돔에 강제로 동기화
-      const inputIds = ['f-name', 'f-grade', 'f-class', 'f-num', 'f-date', 'q-predict', 'q1', 'q2s', 'q2l', 'q3', 'feeling'];
+      // html2canvas 버그 방지: 타이핑된 입력 필드(input) 값들을 가상 돔에 강제로 동기화
+      const inputIds = ['f-name', 'f-grade', 'f-class', 'f-num', 'f-date'];
       inputIds.forEach(id => {
         const originalEl = document.getElementById(id);
         const clonedEl = clonedDoc.getElementById(id);
         if (originalEl && clonedEl) {
           clonedEl.value = originalEl.value;
+        }
+      });
+
+      // 텍스트 여러 문장 잘림 방지 최적화: 
+      // clonedDoc 가상 돔 상의 모든 textarea를 white-space: pre-wrap이 있는 div로 완전 대체하여 캡처합니다.
+      const textareas = clonedDoc.querySelectorAll('textarea');
+      textareas.forEach(ta => {
+        const originalTextarea = document.getElementById(ta.id);
+        const val = originalTextarea ? originalTextarea.value : ta.value;
+
+        const div = clonedDoc.createElement('div');
+        // 원래 스타일 복사 및 자동 늘어나기 속성 지정
+        div.style.width = '100%';
+        div.style.minHeight = ta.style.minHeight || (originalTextarea ? window.getComputedStyle(originalTextarea).minHeight : '52px');
+        div.style.background = '#F8F8F6';
+        div.style.border = '1.5px solid #D8D7D0';
+        div.style.borderRadius = '8px';
+        div.style.padding = '11px 13px';
+        div.style.fontFamily = "'Noto Sans KR', sans-serif";
+        div.style.fontSize = originalTextarea ? window.getComputedStyle(originalTextarea).fontSize : '14px';
+        div.style.lineHeight = '1.7';
+        div.style.color = '#1A1A18';
+        div.style.whiteSpace = 'pre-wrap';
+        div.style.wordBreak = 'break-all';
+        div.style.boxSizing = 'border-box';
+        
+        // 입력 값이 없는 경우 힌트 텍스트나 빈 화면으로 캡처
+        if (!val.trim()) {
+          div.textContent = ta.placeholder || '';
+          div.style.color = '#9A9990';
+        } else {
+          div.textContent = val;
+        }
+
+        // DOM에서 교체
+        if (ta.parentNode) {
+          ta.parentNode.replaceChild(div, ta);
         }
       });
     }
